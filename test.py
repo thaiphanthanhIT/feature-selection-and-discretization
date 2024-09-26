@@ -2,10 +2,11 @@ import numpy as np
 from numpy import *
 from sklearn.feature_selection import chi2, mutual_info_classif
 from sklearn.preprocessing import KBinsDiscretizer
-from sklearn.datasets import load_iris
+from sklearn.datasets import load_iris, load_diabetes, load_wine
 from sklearn.model_selection import train_test_split
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import accuracy_score, mutual_info_score
+from scipy.stats import chi2
 
 
 def algorithm1(F, C, max_d):
@@ -17,15 +18,18 @@ def algorithm1(F, C, max_d):
     Jc = []
 
     for i in range(0, number_features):
-        I_fi_C = mutual_info_score(F[i], C)
-        chi2 = np.log(2) * I_fi_C
+        I_fi_C = mutual_info_classif(F[i].reshape(1, -1), C)
+        chi2_value = 2 * number_samples * np.log(2) * I_fi_C
+
         for j in range(2, max_d + 1):
             discretizer = KBinsDiscretizer(n_bins=j, encode='ordinal', strategy='uniform')
             fi_discretized = discretizer.fit_transform(F[i].reshape(-1, 1)).flatten()
 
-            Jrel = mutual_info_score(fi_discretized, C)
+            degree_of_freedom = (len(np.unique(F[i])) - 1)*(len(np.unique(C)) - 1)
+            MI = mutual_info_score(fi_discretized, C)
+            Jrel = chi2.ppf(I_fi_C, degree_of_freedom)
 
-            if Jrel > chi2:
+            if Jrel > chi2_value:
                 Fi = F[i].reshape(-1, 1)
                 Fc = insert(Fc, [i + 1], Fi, axis=1)
                 Dc.append(j)
@@ -35,7 +39,7 @@ def algorithm1(F, C, max_d):
     return Fc, Dc, Jc
 
 
-def algorithm2(fi, C, di, delta, s):
+def algorithm2(fi, C, di, delta, S):
     Ji = None
     T = None
     best_di = di
@@ -48,8 +52,9 @@ def algorithm2(fi, C, di, delta, s):
         fi_discretized = discretizer.fit_transform(fi.reshape(-1, 1)).flatten()
 
         chi2_Rrc = 1
-        JmDSM = mutual_info_score(fi_discretized, C) - ((len(np.unique(C)) - 1)*(j - 1))/(2*len(fi_discretized)*np.log(2)) + (1/s)
-        print(np.log(2))
+        JmDSM = mutual_info_score(fi_discretized, C) - ((len(np.unique(C)) - 1)*(j - 1))/(2*len(fi_discretized)*np.log(2))
+        for i in range(0, len(S)):
+            JmDSM = JmDSM + (mutual_info_score(np.column_stack([fi_discretized, S[i].flatten()]), C))/len(S)
         if JmDSM > chi2_Rrc:
             best_di = j
             Ji = JmDSM
@@ -66,7 +71,6 @@ def mDSM(F, C, maxd, delta):
     Fc = [Fc[i] for i in sorted_indices]
     Dc = [Dc[i] for i in sorted_indices]
     Jc = [Jc[i] for i in sorted_indices]
-    pre_Sort = np.argsort(sorted_indices)
 
     S = []
     discretizer = KBinsDiscretizer(n_bins=Dc[0], encode='ordinal', strategy='uniform')
@@ -78,14 +82,13 @@ def mDSM(F, C, maxd, delta):
         fi = Fc[i]
         di = Dc[i]
 
-        JmDSM, T, dnew = algorithm2(fi, C, di, delta, len(S))
+        JmDSM, T, dnew = algorithm2(fi, C, di, delta, S)
         discretizer = KBinsDiscretizer(n_bins=dnew, encode='ordinal', strategy='uniform')
         fi_discretized = discretizer.fit_transform(fi.reshape(-1, 1)).flatten()
         if JmDSM is not None and JmDSM > T:
             S.append(fi_discretized)
             D.append(dnew)
-    S = [S[i] for i in pre_Sort]
-    D = [Dc[i] for i in pre_Sort]
+
     return S, D
 
 
