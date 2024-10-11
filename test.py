@@ -1,14 +1,37 @@
+import math
 from collections import Counter
 
 import numpy as np
+import pandas as pd
 from numpy import *
 from sklearn.feature_selection import chi2, mutual_info_classif
 from sklearn.preprocessing import KBinsDiscretizer
 from sklearn.datasets import load_iris, load_diabetes, load_wine
-from sklearn.model_selection import train_test_split
+from sklearn.model_selection import train_test_split, cross_val_score
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import accuracy_score, mutual_info_score
 from scipy.stats import chi2
+from sklearn.svm import SVC
+
+
+def mutual_information(X, Y):
+    counter_X = Counter(X)
+    counter_Y = Counter(Y)
+
+    N = len(X)
+
+    P_X = {x: count / N for x, count in counter_X.items()}
+    P_Y = {y: count / N for y, count in counter_Y.items()}
+
+    joint_counts = Counter(zip(X, Y))
+    P_XY = {key: count / N for key, count in joint_counts.items()}
+
+    MI = 0
+    for (x, y), p_xy in P_XY.items():
+        if p_xy > 0:
+            MI += p_xy * math.log2(p_xy / (P_X[x] * P_Y[y]))
+
+    return MI
 
 def compute_prob(X, Y, Z):
     n = len(Z)
@@ -66,15 +89,15 @@ def algorithm1(F, C, max_d):
     Jc = []
     cnt = 0
     for i in range(0, number_features):
-        I_fi_C = mutual_info_score(F[i], C)
+        I_fi_C = mutual_information(F[i], C)
         chi2_value = 2 * number_samples * np.log(2) * I_fi_C
 
         for j in range(2, max_d + 1):
             discretizer = KBinsDiscretizer(n_bins=j, encode='ordinal', strategy='uniform')
             fi_discretized = discretizer.fit_transform(F[i].reshape(-1, 1)).flatten()
 
-            degree_of_freedom = (len(np.unique(F[i])) - 1)*(len(np.unique(C)) - 1)
-            Jrel = mutual_info_score(fi_discretized, C) + ((j - 1)*(len(np.unique(C)) - 1))/(2 * number_samples * np.log(2))
+            degree_of_freedom = (number_samples - 1)*(len(np.unique(C)) - 1)
+            Jrel = mutual_information(fi_discretized, C)
             chi2_R = chi2.sf(chi2_value, degree_of_freedom)
 
             if Jrel > chi2_R:
@@ -99,16 +122,16 @@ def algorithm2(fi, C, di, delta, S):
 
         discretizer = KBinsDiscretizer(n_bins=j, encode='ordinal', strategy='uniform')
         fi_discretized = discretizer.fit_transform(fi.reshape(-1, 1)).flatten()
-        tmp = len(S)
-        chi2_Rrc = 2 * len(fi_discretized) * np.log(2) * mutual_info_score(fi, C)
-        JmDSM = mutual_info_score(fi_discretized, C) - ((len(np.unique(C)) - 1)*(j - 1))/(2*len(fi_discretized)*np.log(2))
+        chi2_Rrc = chi2.sf((2*len(fi_discretized)*np.log(2)*mutual_information(fi, C)), (len(fi_discretized) - 1)*(len(np.unique(C)) - 1))
+        JmDSM = mutual_information(fi_discretized, C) - ((len(np.unique(C)) - 1)*(j - 1))/(2*len(fi_discretized)*np.log(2))
         for i in range(0, len(S)):
-            f = S[i]
-            k = (len(np.unique(C))*(j - 1)*(len(np.unique(S[i])) - 1))/(2*len(fi_discretized)*np.log(2))
-            q = CMI(fi_discretized, S[i], C)
-            JmDSM = JmDSM + (CMI(fi_discretized, S[i], C) - (len(np.unique(C))*(j - 1)*(len(np.unique(S[i])) - 1))/(2*len(fi_discretized)*np.log(2)) - mutual_info_score(fi_discretized, S[i]) + ((len(np.unique(C)) - 1)*(len(np.unique(S[i])) - 1))/(2*len(fi_discretized)*np.log(2)))/len(S)
-            chi2_Rrc = chi2_Rrc + (2 * len(fi_discretized) * np.log(2) * CMI(fi_discretized, S[i], C) - 2 * len(fi_discretized) * np.log(2) * mutual_info_score(fi, S[i]))/len(S)
-        if JmDSM > chi2_Rrc:
+            k = mutual_information(fi_discretized, S[i]) - ((len(np.unique(C)) - 1)*(len(np.unique(S[i])) - 1))/(2*len(fi_discretized)*np.log(2))
+            n = chi2.sf(2*len(fi_discretized)*np.log(2)*(mutual_information(fi, S[i])-((len(np.unique(C)) - 1)*(len(np.unique(S[i])) - 1))/(2*len(fi_discretized)*np.log(2))), (len(np.unique(C)) - 1)*(len(np.unique(S[i])) - 1))
+            JmDSM = JmDSM + (CMI(fi_discretized, S[i], C) - (len(np.unique(C))*(j - 1)*(len(np.unique(S[i])) - 1))/(2*len(fi_discretized)*np.log(2)) - mutual_information(fi_discretized, S[i]) + ((len(np.unique(C)) - 1)*(len(np.unique(S[i])) - 1))/(2*len(fi_discretized)*np.log(2)))/len(S)
+            chi2_Rrc = chi2_Rrc + (chi2.sf((2*len(fi_discretized)*np.log(2)*CMI(fi_discretized, S[i], C)), len(np.unique(C))*(j - 1)*(len(np.unique(S[i])) - 1)) - chi2.sf(2*len(fi_discretized)*np.log(2)*mutual_information(fi, S[i]), (len(np.unique(C)) - 1)*(len(np.unique(S[i])) - 1)))/len(S)
+        # if JmDSM < 0:
+        #     continue
+        if JmDSM < chi2_Rrc:
             best_di = j
             Ji = JmDSM
             T = chi2_Rrc
@@ -128,7 +151,7 @@ def mDSM(F, C, maxd, delta):
     S = []
     discretizer = KBinsDiscretizer(n_bins=Dc[0], encode='ordinal', strategy='uniform')
     fci_discretized = discretizer.fit_transform(Fc[0].reshape(-1, 1)).flatten()
-    S.append(Fc[0])
+    S.append(fci_discretized)
     D = [Dc[0]]
     Fc.pop(0)
     Dc.pop(0)
@@ -139,46 +162,45 @@ def mDSM(F, C, maxd, delta):
         JmDSM, T, dnew = algorithm2(fi, C, di, delta, S)
         discretizer = KBinsDiscretizer(n_bins=dnew, encode='ordinal', strategy='uniform')
         fi_discretized = discretizer.fit_transform(fi.reshape(-1, 1)).flatten()
-        if JmDSM is not None and JmDSM > T:
+        if JmDSM is not None and JmDSM < T:
             S.append(fi_discretized)
             D.append(dnew)
 
     return S, D
 
-X = np.array([[1, 17, 18, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20],
-     [23, 19, 10, 3, 50, 24, 10, 2, 30, 20, 18, 25, 38, 7, 20, 29, 4, 3, 27, 3],
-     [2, 4, 6, 8, 28, 30, 14, 16, 18, 20, 12, 14, 26, 28, 30, 32, 34, 36, 38, 40],
-     [19, 15, 20, 17, 14, 5, 1, 6, 14, 18, 20, 19, 14, 18, 3, 8, 19, 5, 4, 7],
-     [8, 18, 19, 16, 30, 21, 24, 23, 22, 20, 19, 12, 13, 16, 19, 20, 10, 22, 22, 25]])
-y = np.array([1, 1, 1, 1, 2, 2, 2, 2, 2, 1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 2])
-X = X.T
-# iris = load_iris()
-# X = iris.data
-# y = iris.target
+# X = np.array([[1, 17, 18, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 1, 17, 18, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20],
+#      [23, 19, 10, 3, 50, 24, 10, 2, 30, 20, 18, 25, 38, 7, 20, 29, 4, 3, 27, 3, 23, 19, 10, 3, 50, 24, 10, 2, 30, 20, 18, 25, 38, 7, 20, 29, 4, 3, 27, 3],
+#      [2, 4, 6, 8, 28, 30, 14, 16, 18, 20, 12, 14, 26, 28, 30, 32, 34, 36, 38, 40, 2, 4, 6, 8, 28, 30, 14, 16, 18, 20, 12, 14, 26, 28, 30, 32, 34, 36, 38, 40],
+#      [19, 15, 20, 17, 14, 5, 1, 6, 14, 18, 20, 19, 14, 18, 3, 8, 19, 5, 4, 7, 19, 15, 20, 17, 14, 5, 1, 6, 14, 18, 20, 19, 14, 18, 3, 8, 19, 5, 4, 7],
+#      [8, 18, 19, 16, 30, 21, 24, 23, 22, 20, 19, 12, 13, 16, 19, 20, 10, 22, 22, 25, 8, 18, 19, 16, 30, 21, 24, 23, 22, 20, 19, 12, 13, 16, 19, 20, 10, 22, 22, 25]])
+# y = np.array([1, 1, 1, 1, 2, 2, 2, 2, 2, 1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 2, 1, 1, 1, 1, 2, 2, 2, 2, 2, 1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 2])
+# X = X.T
+# X_train = X[:20]
+# X_test = X[20:]
+# y_train = y[:20]
+# y_test = y[20:]
 
-X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=42)
+# wine = load_wine()
+# X = wine.data
+# y = wine.target
+spambase_data = pd.read_csv('path_to_spambase/spambase.data', header=None)
 
-max_d = 10
-delta = 2
-S, D = mDSM(X_train.T, y_train, max_d, delta)
+X = spambase_data.iloc[:, :-1]  # X là tất cả các cột trừ cột cuối cùng (các features)
+y = spambase_data.iloc[:, -1]
 
-clf = RandomForestClassifier()
+max_d = 50
+delta = 5
+S, D = mDSM(X.T, y, max_d, delta)
 
-X_train_selected = np.array(S).T
-X_test_selected = np.array([X_test[:, i] for i in range(len(S))]).T
+X_selected = np.array(S).T
+# X_test_selected = np.array([X_test[:, i] for i in range(len(S))]).T
 
-clf.fit(X_train_selected, y_train)
+clf = SVC(kernel='linear')
 
-y_pred = clf.predict(X_test_selected)
-accuracy = accuracy_score(y_test, y_pred)
+scores_selected = cross_val_score(clf, X_selected, y, cv=10)
+print(f"Độ chính xác trung bình với các đặc trưng đã chọn (10-CV): {scores_selected.mean():.4f}")
 
-print(f"Độ chính xác của mô hình khi sử dụng các đặc trưng đã chọn: {accuracy:.4f}")
+clf_all = SVC(kernel='linear')
 
-clf_all = RandomForestClassifier()
-clf_all.fit(X_train, y_train)
-
-y_pred_all = clf_all.predict(X_test)
-accuracy_all = accuracy_score(y_test, y_pred_all)
-
-print(f"Độ chính xác của mô hình khi sử dụng tất cả các đặc trưng: {accuracy_all:.4f}")
-
+scores_all = cross_val_score(clf_all, X, y, cv=10)
+print(f"Độ chính xác trung bình với tất cả đặc trưng (10-CV): {scores_all.mean():.4f}")
