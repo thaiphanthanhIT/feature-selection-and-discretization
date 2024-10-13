@@ -2,19 +2,41 @@ import math
 from collections import Counter
 
 import numpy as np
+from sklearn.neighbors import KNeighborsClassifier
+from ucimlrepo import fetch_ucirepo
+import openml
 import pandas as pd
 from numpy import *
 from sklearn.feature_selection import chi2, mutual_info_classif
 from sklearn.preprocessing import KBinsDiscretizer
 from sklearn.datasets import load_iris, load_diabetes, load_wine
-from sklearn.model_selection import train_test_split, cross_val_score
+from sklearn.model_selection import train_test_split, cross_val_score, LeaveOneOut
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import accuracy_score, mutual_info_score
 from scipy.stats import chi2
 from sklearn.svm import SVC
 
+def calc_MI(X, Y, bins):
+    c_XY = np.histogram2d(X, Y, bins)[0]
+    c_X = np.histogram(X, bins)[0]
+    c_Y = np.histogram(Y, bins)[0]
+
+    H_X = shan_entropy(c_X)
+    H_Y = shan_entropy(c_Y)
+    H_XY = shan_entropy(c_XY)
+
+    MI = H_X + H_Y - H_XY
+    return MI
+
+
+def shan_entropy(c):
+    c_normalized = c / float(np.sum(c))
+    c_normalized = c_normalized[np.nonzero(c_normalized)]
+    H = -sum(c_normalized * np.log2(c_normalized))
+    return H
 
 def mutual_information(X, Y):
+
     counter_X = Counter(X)
     counter_Y = Counter(Y)
 
@@ -89,12 +111,14 @@ def algorithm1(F, C, max_d):
     Jc = []
     cnt = 0
     for i in range(0, number_features):
-        I_fi_C = mutual_information(F[i], C)
+        I_fi_C = mutual_information(F[i], C) # (len(np.unique(F[i])) - 1)*(len(np.unique(C)) - 1)/(2 * number_samples * np.log(2))
         chi2_value = 2 * number_samples * np.log(2) * I_fi_C
 
         for j in range(2, max_d + 1):
-            discretizer = KBinsDiscretizer(n_bins=j, encode='ordinal', strategy='uniform')
-            fi_discretized = discretizer.fit_transform(F[i].reshape(-1, 1)).flatten()
+            bin_edges = np.percentile(F[i], np.linspace(0, 100, j))
+            fi_discretized = np.digitize(F[i], bin_edges, right=True)
+            # discretizer = KBinsDiscretizer(n_bins=j, encode='ordinal', strategy='uniform')
+            # fi_discretized = discretizer.fit_transform(F[i].reshape(-1, 1)).flatten()
 
             degree_of_freedom = (number_samples - 1)*(len(np.unique(C)) - 1)
             Jrel = mutual_information(fi_discretized, C)
@@ -116,7 +140,7 @@ def algorithm2(fi, C, di, delta, S):
     T = None
     best_di = di
 
-    for j in range(di - delta, di + delta + 1):
+    for j in range(di, di + delta + 1):
         if j < 2:
             continue
 
@@ -180,27 +204,44 @@ def mDSM(F, C, maxd, delta):
 # y_train = y[:20]
 # y_test = y[20:]
 
-# wine = load_wine()
-# X = wine.data
-# y = wine.target
-spambase_data = pd.read_csv('path_to_spambase/spambase.data', header=None)
+# iris = load_iris()
+# X = iris.data
+# y = iris.target
 
-X = spambase_data.iloc[:, :-1]  # X là tất cả các cột trừ cột cuối cùng (các features)
-y = spambase_data.iloc[:, -1]
+dataset = fetch_ucirepo(id=143)
 
-max_d = 50
-delta = 5
-S, D = mDSM(X.T, y, max_d, delta)
+X = dataset.data.features
+y = dataset.data.targets
+X = X.values
 
-X_selected = np.array(S).T
+
+max_d = int(len(y)/10)
+delta = 2
+S, D = mDSM(X.T, y.T, max_d, delta)
+y = y.values
+X = np.array(S).T
 # X_test_selected = np.array([X_test[:, i] for i in range(len(S))]).T
 
-clf = SVC(kernel='linear')
-
-scores_selected = cross_val_score(clf, X_selected, y, cv=10)
+# clf = SVC(kernel='linear')
+clf = KNeighborsClassifier(n_neighbors=len(unique(y)))
+scores_selected = cross_val_score(clf, X, y, cv=10)
+print(len(S))
 print(f"Độ chính xác trung bình với các đặc trưng đã chọn (10-CV): {scores_selected.mean():.4f}")
 
-clf_all = SVC(kernel='linear')
 
-scores_all = cross_val_score(clf_all, X, y, cv=10)
-print(f"Độ chính xác trung bình với tất cả đặc trưng (10-CV): {scores_all.mean():.4f}")
+# model = SVC(kernel='linear')
+# loo = LeaveOneOut()
+# y_true, y_pred = [], []
+# for train_index, test_index in loo.split(X):
+#     X_train, X_test = X[train_index], X[test_index]
+#     y_train, y_test = y[train_index], y[test_index]
+#     model.fit(X_train, y_train)
+#     y_pred.append(model.predict(X_test)[0])
+#     y_true.append(y_test[0])
+# accuracy = accuracy_score(y_true, y_pred)
+# print(f'Độ chính xác trung bình với các đặc trưng đã chọn (LOO): {accuracy:.4f}')
+
+# clf_all = SVC(kernel='linear')
+#
+# scores_all = cross_val_score(clf_all, X, y, cv=10)
+# print(f"Độ chính xác trung bình với tất cả đặc trưng (10-CV): {scores_all.mean():.4f}")
