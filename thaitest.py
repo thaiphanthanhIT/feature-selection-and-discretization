@@ -1,49 +1,34 @@
-import math
-from collections import Counter
+from enum import unique
 
 import numpy as np
-from scipy.stats import chi2_contingency
 
-def mutual_information(X, Y):
+def convert_array_class(A):
+    sorted_A = sorted(set(A))
+    rank_map = {value: rank for rank, value in enumerate(sorted_A)}
 
-    counter_X = Counter(X)
-    counter_Y = Counter(Y)
+    result = [rank_map[value] for value in A]
+    return result
 
-    N = len(X)
+def convert_array_feature(A):
+    sorted_A = sorted(set(A))
+    rank_map = {value: rank + 1 for rank, value in enumerate(sorted_A)}
 
-    P_X = {x: count / N for x, count in counter_X.items()}
-    P_Y = {y: count / N for y, count in counter_Y.items()}
+    result = [rank_map[value] for value in A]
+    return result
+def calculate_frequency(bin, cls):
+    num_bins = len(np.unique(bin)) + 1
+    num_classes = len(np.unique(cls))
+    freq = np.zeros((num_classes, num_bins), dtype=int)
 
-    joint_counts = Counter(zip(X, Y))
-    P_XY = {key: count / N for key, count in joint_counts.items()}
+    for b, c in zip(bin, cls):
+        freq[c, b] += 1
 
-    MI = 0
-    for (x, y), p_xy in P_XY.items():
-        if p_xy > 0:
-            MI += p_xy * math.log2(p_xy / (P_X[x] * P_Y[y]))
+    return freq
 
-    return MI
-def calc_MI(X, Y, bins):
-    c_XY = np.histogram2d(X, Y, bins)[0]
-    c_X = np.histogram(X, bins)[0]
-    c_Y = np.histogram(Y, bins)[0]
+# A = [5, 10, 15, 10]
+# B = [0, 0, 1, 1]
+# val = convert_array(A)
+# freq = calculate_frequency(val, B)
+# print(val)
+# print(freq)
 
-    H_X = shan_entropy(c_X)
-    H_Y = shan_entropy(c_Y)
-    H_XY = shan_entropy(c_XY)
-
-    MI = H_X + H_Y - H_XY
-    return MI
-
-
-def shan_entropy(c):
-    c_normalized = c / float(np.sum(c))
-    c_normalized = c_normalized[np.nonzero(c_normalized)]
-    H = -sum(c_normalized * np.log2(c_normalized))
-    return H
-
-
-y = np.array([1, 1, 1, 1, 2, 2, 2, 2, 2, 1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 2])
-X = np.array([1, 17, 18, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20])
-print(calc_MI(X,y,20))
-print(mutual_information(X,y))
