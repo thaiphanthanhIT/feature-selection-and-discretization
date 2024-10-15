@@ -229,6 +229,14 @@ S, D = mDSM(X.T, y.T, max_d, delta)
 X = np.array(S).T
 # X_test_selected = np.array([X_test[:, i] for i in range(len(S))]).T
 
+# Use KNN classifier
+knn = KNeighborsClassifier()
+X_train, X_test, y_train, y_test = train_test_split(np.array(S).T, y, test_size=0.2)
+knn.fit(X_train, y_train)
+accuracy_knn = accuracy_score(y_test, knn.predict(X_test))
+print(len(S))
+print(f"Độ chính xác trung bình với các đặc trưng đã chọn (10-CV): {accuracy_knn.mean():.4f}")
+
 # big
 clf = SVC(kernel='linear')
 # clf = KNeighborsClassifier(n_neighbors=len(unique(y)))
