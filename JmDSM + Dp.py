@@ -123,7 +123,7 @@ def algorithm1_change(F, C, max_d):
         I_fi_C = mutual_information(fi, C.T)
         chi2_value = 2 * number_samples * np.log(2) * I_fi_C
         degree_of_freedom = (number_samples - 1) * (len(np.unique(C)) - 1)
-        fci_discretized = pd.cut(F[:][i], bins=[-1] + spl_val, labels=False)
+        fci_discretized = pd.cut(F[:][i], bins=[float('-inf')] + spl_val, labels=False)
         Jrel = mutual_information(fci_discretized, C.T)
         chi2_R = chi2.sf(chi2_value, degree_of_freedom)
         if Jrel > chi2_R:
@@ -211,7 +211,7 @@ def mDSM(F, C, maxd, delta):
     S = []
     # discretizer = KBinsDiscretizer(n_bins=Dc[0], encode='ordinal', strategy='uniform')
     # fci_discretized = discretizer.fit_transform(Fc[0].reshape(-1, 1)).flatten()
-    fci_discretized = pd.cut(Fc[0], bins=[-1]+split_val[0], labels=False)
+    fci_discretized = pd.cut(Fc[0], bins=[float('-inf')]+split_val[0], labels=False)
     S.append(fci_discretized)
     D = [Dc[0]]
     Fc.pop(0)
@@ -227,14 +227,14 @@ def mDSM(F, C, maxd, delta):
         #     S.append(fi_discretized)
         #     D.append(dnew)
 
-        fci_discretized = pd.cut(Fc[i], bins=[-1]+split_val[i], labels=False)
+        fci_discretized = pd.cut(Fc[i], bins=[float('-inf')]+split_val[i], labels=False)
         S.append(fci_discretized)
         D.append(Dc[i])
 
     return S, D
 
 
-dataset = fetch_ucirepo(id=110)
+dataset = fetch_ucirepo(id=50)
 
 X = dataset.data.features
 y = dataset.data.targets
@@ -257,17 +257,17 @@ print(len(S))
 print(f"Độ chính xác trung bình với các đặc trưng đã chọn (10-CV): {scores_selected.mean():.4f}")
 
 # small
-# model = SVC(kernel='linear')
-# loo = LeaveOneOut()
-# y_true, y_pred = [], []
-# for train_index, test_index in loo.split(X):
-#     X_train, X_test = X[train_index], X[test_index]
-#     y_train, y_test = y[train_index], y[test_index]
-#     model.fit(X_train, y_train)
-#     y_pred.append(model.predict(X_test)[0])
-#     y_true.append(y_test[0])
-# accuracy = accuracy_score(y_true, y_pred)
-# print(f'Độ chính xác trung bình với các đặc trưng đã chọn (LOO): {accuracy:.4f}')
+model = SVC(kernel='linear')
+loo = LeaveOneOut()
+y_true, y_pred = [], []
+for train_index, test_index in loo.split(X):
+    X_train, X_test = X[train_index], X[test_index]
+    y_train, y_test = y[train_index], y[test_index]
+    model.fit(X_train, y_train)
+    y_pred.append(model.predict(X_test)[0])
+    y_true.append(y_test[0])
+accuracy = accuracy_score(y_true, y_pred)
+print(f'Độ chính xác trung bình với các đặc trưng đã chọn (LOO): {accuracy:.4f}')
 
 # clf_all = SVC(kernel='linear')
 #
