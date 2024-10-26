@@ -111,14 +111,12 @@ def algorithm1(F, C, max_d):
     Jc = []
     cnt = 0
     for i in range(0, number_features):
-        I_fi_C = mutual_information(F[i], C) # (len(np.unique(F[i])) - 1)*(len(np.unique(C)) - 1)/(2 * number_samples * np.log(2))
+        I_fi_C = mutual_information(F[i], C)# - (len(np.unique(F[i])) - 1)*(len(np.unique(C)) - 1)/(2 * number_samples * np.log(2))
         chi2_value = 2 * number_samples * np.log(2) * I_fi_C
 
         for j in range(2, max_d + 1):
             bin_edges = np.percentile(F[i], np.linspace(0, 100, j))
             fi_discretized = np.digitize(F[i], bin_edges, right=True)
-            # discretizer = KBinsDiscretizer(n_bins=j, encode='ordinal', strategy='uniform')
-            # fi_discretized = discretizer.fit_transform(F[i].reshape(-1, 1)).flatten()
 
             degree_of_freedom = (number_samples - 1)*(len(np.unique(C)) - 1)
             Jrel = mutual_information(fi_discretized, C)
@@ -149,10 +147,12 @@ def algorithm2(fi, C, di, delta, S):
         chi2_Rrc = chi2.sf((2*len(fi_discretized)*np.log(2)*mutual_information(fi, C)), (len(fi_discretized) - 1)*(len(np.unique(C)) - 1))
         JmDSM = mutual_information(fi_discretized, C) - ((len(np.unique(C)) - 1)*(j - 1))/(2*len(fi_discretized)*np.log(2))
         for i in range(0, len(S)):
-            k = mutual_information(fi_discretized, S[i]) - ((len(np.unique(C)) - 1)*(len(np.unique(S[i])) - 1))/(2*len(fi_discretized)*np.log(2))
-            n = chi2.sf(2*len(fi_discretized)*np.log(2)*(mutual_information(fi, S[i])-((len(np.unique(C)) - 1)*(len(np.unique(S[i])) - 1))/(2*len(fi_discretized)*np.log(2))), (len(np.unique(C)) - 1)*(len(np.unique(S[i])) - 1))
-            JmDSM = JmDSM + (CMI(fi_discretized, S[i], C) - (len(np.unique(C))*(j - 1)*(len(np.unique(S[i])) - 1))/(2*len(fi_discretized)*np.log(2)) - mutual_information(fi_discretized, S[i]) + ((len(np.unique(C)) - 1)*(len(np.unique(S[i])) - 1))/(2*len(fi_discretized)*np.log(2)))/len(S)
-            chi2_Rrc = chi2_Rrc + (chi2.sf((2*len(fi_discretized)*np.log(2)*CMI(fi_discretized, S[i], C)), len(np.unique(C))*(j - 1)*(len(np.unique(S[i])) - 1)) - chi2.sf(2*len(fi_discretized)*np.log(2)*mutual_information(fi, S[i]), (len(np.unique(C)) - 1)*(len(np.unique(S[i])) - 1)))/len(S)
+            k1 = CMI(fi_discretized, S[i], C) - (len(np.unique(C))*(j - 1)*(len(np.unique(S[i])) - 1))/(2*len(fi_discretized)*np.log(2))
+            k2 = chi2.sf((2*len(fi_discretized)*np.log(2)*CMI(fi_discretized, S[i], C)), len(np.unique(C))*(j - 1)*(len(np.unique(S[i])) - 1))
+            n1 = mutual_information(fi_discretized, S[i]) - ((j - 1)*(len(np.unique(S[i])) - 1))/(2*len(fi_discretized)*np.log(2))
+            n2 = chi2.sf(2*len(fi_discretized)*np.log(2)*mutual_information(fi, S[i]), (j - 1)*(len(np.unique(S[i])) - 1))
+            JmDSM = JmDSM + (CMI(fi_discretized, S[i], C) - mutual_information(fi_discretized, S[i]))/len(S)
+            chi2_Rrc = chi2_Rrc + (chi2.sf((2*len(fi_discretized)*np.log(2)*CMI(fi_discretized, S[i], C)), len(np.unique(C))*(j - 1)*(len(np.unique(S[i])) - 1)) - chi2.sf(2*len(fi_discretized)*np.log(2)*mutual_information(fi, S[i]), (j - 1)*(len(np.unique(S[i])) - 1)))/len(S)
         # if JmDSM < 0:
         #     continue
         if JmDSM < chi2_Rrc:
@@ -175,7 +175,9 @@ def mDSM(F, C, maxd, delta):
     S = []
     discretizer = KBinsDiscretizer(n_bins=Dc[0], encode='ordinal', strategy='uniform')
     fci_discretized = discretizer.fit_transform(Fc[0].reshape(-1, 1)).flatten()
-    S.append(fci_discretized)
+    # bin_edges = np.percentile(Fc[0], np.linspace(0, 100, Dc[0]))
+    # fci_discretized = np.digitize(Fc[0], bin_edges, right=True)
+    S.append(Fc[0])
     D = [Dc[0]]
     Fc.pop(0)
     Dc.pop(0)
@@ -184,11 +186,13 @@ def mDSM(F, C, maxd, delta):
         di = Dc[i]
 
         JmDSM, T, dnew = algorithm2(fi, C, di, delta, S)
-        discretizer = KBinsDiscretizer(n_bins=dnew, encode='ordinal', strategy='uniform')
+        discretizer = KBinsDiscretizer(n_bins=di, encode='ordinal', strategy='uniform')
         fi_discretized = discretizer.fit_transform(fi.reshape(-1, 1)).flatten()
+        # bin_edges = np.percentile(fi, np.linspace(0, 100, di))
+        # fi_discretized = np.digitize(fi, bin_edges, right=True)
         if JmDSM is not None and JmDSM < T:
             S.append(fi_discretized)
-            D.append(dnew)
+            D.append(di)
 
     return S, D
 
@@ -203,23 +207,25 @@ def mDSM(F, C, maxd, delta):
 # X_test = X[20:]
 # y_train = y[:20]
 # y_test = y[20:]
-#
-# iris = load_iris()
-# X = iris.data
-# y = iris.target
 
-dataset = fetch_ucirepo(id=33)
+iris = load_iris()
+X = iris.data
+y = iris.target
 
-X = dataset.data.features
-y = dataset.data.targets
-X = X.drop('age', axis=1)
-X = X.values
+# dataset = fetch_ucirepo(id=53)
 #
-#
+# X = dataset.data.features
+# y = dataset.data.targets
+# # X = X.drop('age', axis=1)
+# # X = X.drop('thal', axis=1)
+# # X['ca'].fillna(X['ca'].mean(), inplace=True)
+# # X['thal'].fillna(X['thal'].mean(), inplace=True)
+# X = X.values
+
 max_d = int(len(y)/10)
 delta = 2
 S, D = mDSM(X.T, y.T, max_d, delta)
-y = y.values
+# y = y.values
 X = np.array(S).T
 # X_test_selected = np.array([X_test[:, i] for i in range(len(S))]).T
 

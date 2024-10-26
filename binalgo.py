@@ -3,8 +3,6 @@ import pandas as pd
 from ucimlrepo import fetch_ucirepo
 
 import utils, metrics
-from thaitest import calculate_frequency, convert_array_feature, convert_array_class
-
 
 def Opt(val, cand, mode):
     '''
@@ -26,7 +24,7 @@ def Opt(val, cand, mode):
         return val, False
 
 
-def scoreDP(val, freq, mode='max', metric='mi', L=2, R=100, cost_mat=None, mic=False, nX=None):
+def scoreDP(val, freq, mode='max', metric='mi', L=2, R=500, cost_mat=None, mic=False, nX=None):
     '''
     Proposed score-wise Dynamic programming algorithm
     NOTE: For DP[v][l], v is 1-based and l is 1-based
