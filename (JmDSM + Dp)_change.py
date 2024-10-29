@@ -112,7 +112,6 @@ def algorithm1_change(F, C):
     number_features = F.shape[1]
     number_samples = F.shape[0]
     result = pd.concat([F, C], axis=1)
-
     Fc = np.zeros((number_samples, 1))
     Dc = []
     split_val = []
@@ -121,14 +120,15 @@ def algorithm1_change(F, C):
     for i in F.columns:
         val, freq, _ = utils.makePrebins(result, i, C.columns[0])
         opt_score, spl_val, j = scoreDP(val, freq)
-        fi = F[:][i].values.T
-        I_fi_C = mutual_information(fi, C['Class'].T)
-        chi2_value = 2 * number_samples * np.log(2) * I_fi_C
-        degree_of_freedom = (number_samples - 1) * (len(np.unique(C)) - 1)
+        print(i)
+        # fi = F[:][i].values.T
+        # I_fi_C = mutual_information(fi, C['class'].T)
+        # chi2_value = 2 * number_samples * np.log(2) * I_fi_C
+        # degree_of_freedom = (number_samples - 1) * (len(np.unique(C)) - 1)
         fci_discretized = pd.cut(F[:][i], bins=[float('-inf')] + spl_val, labels=False)
-        Jrel = mutual_information(fci_discretized, C['Class'].T)
-        chi2_R = chi2.sf(chi2_value, degree_of_freedom)
-        if Jrel > chi2_R:
+        Jrel = mutual_information(fci_discretized, C['class'].T)
+        # chi2_R = chi2.sf(chi2_value, degree_of_freedom)
+        if 1:
             Fi = F[:][i].values
             Fi = Fi.reshape(-1, 1)
             Fc = insert(Fc, [cnt + 1], Fi, axis=1)
@@ -137,6 +137,7 @@ def algorithm1_change(F, C):
             split_val.append(spl_val)
             cnt = cnt + 1
     Fc = np.delete(Fc, 0, axis=1)
+
     return Fc, Dc, Jc, split_val
 def algorithm2(fi, C, di, S, split_val, JmDSM_pre):
     j = di
@@ -149,26 +150,26 @@ def algorithm2(fi, C, di, S, split_val, JmDSM_pre):
     # discretizer = KBinsDiscretizer(n_bins=j, encode='ordinal', strategy='uniform')
     # fi_discretized = discretizer.fit_transform(fi.reshape(-1, 1)).flatten()
     fi_discretized = pd.cut(fi, bins=[float('-inf')] + split_val, labels=False)
-    chi2_Rrc = chi2.sf((2*len(fi_discretized)*np.log(2)*mutual_information(fi, C['Class'].T)), (len(fi_discretized) - 1)*(len(np.unique(C)) - 1))
-    JmDSM = mutual_information(fi_discretized, C['Class'].T) - ((len(np.unique(C)) - 1)*(j - 1))/(2*len(fi_discretized)*np.log(2))
-    JmDSM_ori = mutual_information(fi_discretized, C['Class'].T)
+    chi2_Rrc = chi2.sf((2*len(fi_discretized)*np.log(2)*mutual_information(fi, C['class'].T)), (len(fi_discretized) - 1)*(len(np.unique(C)) - 1))
+    JmDSM = mutual_information(fi_discretized, C['class'].T) - ((len(np.unique(C)) - 1)*(j - 1))/(2*len(fi_discretized)*np.log(2))
+    JmDSM_ori = mutual_information(fi_discretized, C['class'].T)
     c = 0
     c_test = 0
     r = 0
     r_test = 0
     for i in range(0, len(S)):
-        c = c + CMI(fi_discretized, S[i], C['Class'].T)# - (len(np.unique(C))*(j - 1)*(len(np.unique(S[i])) - 1))/(2*len(fi_discretized)*np.log(2))
-        c_test = c_test + chi2.sf((2*len(fi_discretized)*np.log(2)*CMI(fi_discretized, S[i], C['Class'].T)), len(np.unique(C))*(j - 1)*(len(np.unique(S[i])) - 1))
+        c = c + CMI(fi_discretized, S[i], C['class'].T)# - (len(np.unique(C))*(j - 1)*(len(np.unique(S[i])) - 1))/(2*len(fi_discretized)*np.log(2))
+        c_test = c_test + chi2.sf((2*len(fi_discretized)*np.log(2)*CMI(fi_discretized, S[i], C['class'].T)), len(np.unique(C))*(j - 1)*(len(np.unique(S[i])) - 1))
         r = r + mutual_information(fi_discretized, S[i]) - ((j - 1)*(len(np.unique(S[i])) - 1))/(2*len(fi_discretized)*np.log(2))
         r_test = r_test + chi2.sf(2*len(fi_discretized)*np.log(2)*mutual_information(fi, S[i]), (j - 1)*(len(np.unique(S[i])) - 1))
-        JmDSM = JmDSM + (CMI(fi_discretized, S[i], C['Class'].T) - (len(np.unique(C))*(j - 1)*(len(np.unique(S[i])) - 1))/(2*len(fi_discretized)*np.log(2)) - mutual_information(fi_discretized, S[i]) + ((j - 1)*(len(np.unique(S[i])) - 1))/(2*len(fi_discretized)*np.log(2)))/len(S)
-        chi2_Rrc = chi2_Rrc + (chi2.sf((2*len(fi_discretized)*np.log(2)*CMI(fi_discretized, S[i], C['Class'].T)), len(np.unique(C))*(j - 1)*(len(np.unique(S[i])) - 1)) - chi2.sf(2*len(fi_discretized)*np.log(2)*mutual_information(fi, S[i]), (j - 1)*(len(np.unique(S[i])) - 1)))/len(S)
-        JmDSM_ori = JmDSM_ori + (CMI(fi_discretized, S[i], C['Class'].T) - mutual_information(fi_discretized, S[i]))/len(S)
-    if JmDSM > (JmDSM_pre - 30):
+        JmDSM = JmDSM + (CMI(fi_discretized, S[i], C['class'].T) - (len(np.unique(C))*(j - 1)*(len(np.unique(S[i])) - 1))/(2*len(fi_discretized)*np.log(2)) - mutual_information(fi_discretized, S[i]) + ((j - 1)*(len(np.unique(S[i])) - 1))/(2*len(fi_discretized)*np.log(2)))/len(S)
+        chi2_Rrc = chi2_Rrc + (chi2.sf((2*len(fi_discretized)*np.log(2)*CMI(fi_discretized, S[i], C['class'].T)), len(np.unique(C))*(j - 1)*(len(np.unique(S[i])) - 1)) - chi2.sf(2*len(fi_discretized)*np.log(2)*mutual_information(fi, S[i]), (j - 1)*(len(np.unique(S[i])) - 1)))/len(S)
+        JmDSM_ori = JmDSM_ori + (CMI(fi_discretized, S[i], C['class'].T) - mutual_information(fi_discretized, S[i]))/len(S)
+    if JmDSM_ori > (JmDSM_pre - 0.03):
         check = 1
     print(JmDSM_ori, JmDSM, chi2_Rrc)
 
-    return JmDSM, check
+    return JmDSM_ori, check
 
 
 def mDSM(F, C):
@@ -221,19 +222,37 @@ def mDSM(F, C):
     return S, D
 
 
-dataset = fetch_ucirepo(id=94)
+# dataset = fetch_ucirepo(id=74)
+#
+# X = dataset.data.features
+# y = dataset.data.targets
+# y_ = dataset.data.targets
+# # y = y.drop('NSP', axis=1)
+# # X = X.drop('MUSK-188', axis=1)
+# # X = X.values
+#
+# le = LabelEncoder()
+# X['molecule_name'] = le.fit_transform(X['molecule_name'])
+# X['conformation_name'] = le.fit_transform(X['conformation_name'])
+# y_['class'] = le.fit_transform(y_['class'])
+# # y = y.to_numpy()
 
-X = dataset.data.features
-y = dataset.data.targets
-y_ = dataset.data.targets
-# y = y.drop('NSP', axis=1)
-# X = X.drop('age', axis=1)
-# X = X.values
+with open('arrhythmia.data', 'r') as file:
+    lines = file.readlines()
 
-le = LabelEncoder()
-y_['Class'] = le.fit_transform(y_['Class'])
-# y = y.to_numpy()
+    features = []
+    targets = []
 
+    for line in lines:
+        row = [float(i) if i != '?' else np.nan for i in line.strip().split(",")]
+        features.append(row[:-1])
+        targets.append(row[-1])
+
+    X = pd.DataFrame(features)
+    y = pd.DataFrame(targets, columns=["class"])
+
+    X.fillna(X.mean(), inplace=True)
+    y.fillna(y.mean(), inplace=True)
 
 S, D = mDSM(X, y)
 y = y.values

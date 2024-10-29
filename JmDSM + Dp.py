@@ -234,7 +234,7 @@ def mDSM(F, C, maxd, delta):
     return S, D
 
 
-dataset = fetch_ucirepo(id=151)
+dataset = fetch_ucirepo(id=74)
 
 X = dataset.data.features
 y = dataset.data.targets
