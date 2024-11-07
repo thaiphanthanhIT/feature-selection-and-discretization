@@ -3,7 +3,8 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import math
 
-def visualize(viz, xtitle, ytitle, title, show = False, dir = None, legend = True):
+
+def visualize(viz, xtitle, ytitle, title, show=False, dir=None, legend=True):
     '''
     Visualize multiple plots on a same fig
 
@@ -18,7 +19,7 @@ def visualize(viz, xtitle, ytitle, title, show = False, dir = None, legend = Tru
     '''
     fig, axes = plt.subplots()
     for v in viz:
-        axes.plot(np.arange(1, v[0].shape[0] + 1), v[0], label = v[1])
+        axes.plot(np.arange(1, v[0].shape[0] + 1), v[0], label=v[1])
     if legend:
         axes.legend()
     axes.set_xlabel(xtitle)
@@ -28,6 +29,7 @@ def visualize(viz, xtitle, ytitle, title, show = False, dir = None, legend = Tru
         plt.savefig(dir)
     if show:
         plt.show()
+
 
 def cleanseNA(fea_vec):
     '''
@@ -45,6 +47,7 @@ def cleanseNA(fea_vec):
     avail_index = np.argwhere(~np.isnan(fea_vec)).flatten().tolist()
     return fea_vec[avail_index]
 
+
 def makeVal(df, feature):
     '''
     Obtaining list of distinct value regarding specified feature (0-based)
@@ -55,7 +58,8 @@ def makeVal(df, feature):
     val = cleanseNA(val)
     return val
 
-def makePrebins(df, feature, label, num_classes = 2):
+
+def makePrebins(df, feature, label, num_classes=2):
     '''
     Pre-discretizing feature into pre-bins
 
@@ -80,7 +84,7 @@ def makePrebins(df, feature, label, num_classes = 2):
 
     # print(df[label])
 
-    catcode = pd.Series(pd.Categorical(df[label], categories= df[label].unique())).cat.codes
+    catcode = pd.Series(pd.Categorical(df[label], categories=df[label].unique())).cat.codes
     # print(catcode)
     # Get number of class
     num_classes = max(catcode) + 1
@@ -98,12 +102,13 @@ def makePrebins(df, feature, label, num_classes = 2):
     freq = []
     for i in range(num_classes):
         freq.append([0] + list(valdict[i].values()))
-    
+
     freq = np.array(freq)
 
     return val, freq, valdict
 
-def initMode(mode, val= 1e9):
+
+def initMode(mode, val=1e9):
     '''
     Initial value for corresponding mode ('min' or 'max').
     Default absolute value: 1e9
@@ -113,6 +118,7 @@ def initMode(mode, val= 1e9):
     else:
         return -val
 
+
 def binSearch(arr, val):
     '''
     Binary search for an index idx of arr such that arr[idx] = val
@@ -120,8 +126,8 @@ def binSearch(arr, val):
     return -1 if there is no such index
     '''
     L = 0
-    R = len(arr)-1
-    while(L <= R):
+    R = len(arr) - 1
+    while (L <= R):
         mid = int((L + R) / 2)
         if arr[mid] == val:
             return mid
@@ -131,20 +137,23 @@ def binSearch(arr, val):
             R = mid - 1
     return -1
 
+
 def discretizeFea(df, fea, split):
     '''
-    Discretize df[fea] w.r.t split 
+    Discretize df[fea] w.r.t split
 
     Output:
     -----
     A ndarray of discretized feature, with values ranging from 0 to n_bin-1
     '''
     # print(df[fea])
-    full_split = [df[fea].min()-1] + list(split) + [df[fea].max()+1] # Adding the smallest and largest value to the split-list
+    full_split = [df[fea].min() - 1] + list(split) + [
+        df[fea].max() + 1]  # Adding the smallest and largest value to the split-list
     # if fea == 'Y':
     #     print(df[fea])
     #     print(pd.cut(df[fea], bins= full_split, labels= False))
-    return pd.cut(df[fea], bins= full_split, labels= False)
+    return pd.cut(df[fea], bins=full_split, labels=False)
+
 
 def mask2Split(mask, val):
     '''
@@ -164,6 +173,7 @@ def mask2Split(mask, val):
     splt = mask * val
     return splt[splt != 0]
 
+
 def split2Mask(split, val):
     '''
     Convert from split to mask, regarding val
@@ -181,7 +191,7 @@ def split2Mask(split, val):
     '''
     splt_ptr = 0
     mask = np.zeros_like(val).astype(int)
-    
+
     for i in range(len(val)):
         if splt_ptr < len(split) and math.fabs(val[i] - split[splt_ptr]) < 1e-3:
             mask[i] = 1

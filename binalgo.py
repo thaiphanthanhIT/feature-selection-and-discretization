@@ -4,6 +4,7 @@ from ucimlrepo import fetch_ucirepo
 
 import utils, metrics
 
+
 def Opt(val, cand, mode):
     '''
     Update 'val' using 'cand', regarding 'mode'
@@ -36,8 +37,8 @@ def scoreDP(val, freq, mode='max', metric='mi', L=2, R=500, cost_mat=None, mic=F
     threshold               : Score threshold
     mode {'min' or 'max'}   : Configure to minimize or maximize the metric (Default: 'min')
     metric {'entropy', ...} : Chosen metric (Default: 'entropy')
-    L                       : Maximum number of discretized bin (Default: 5) 
-    R                       : Maximum number of discretized bin (Default: 15) 
+    L                       : Maximum number of discretized bin (Default: 5)
+    R                       : Maximum number of discretized bin (Default: 15)
     cost_mat {ndarray}      : The cost matrix
 
     Output:
@@ -45,7 +46,7 @@ def scoreDP(val, freq, mode='max', metric='mi', L=2, R=500, cost_mat=None, mic=F
     dp_record {List}        : List of dp[n_val][l]; l in [1, R]
     split_val {List}        : List of split values (upperbounds are used)
     opt_L {int}             : The number of discretized bin chosen
-    
+
     '''
     # print("Start of scoreDP")
     if mic:
@@ -166,7 +167,6 @@ def equalWidth(df, FEATURE, n_bin, freq, val, metric='entropy'):
             score += metrics.getMetric(freq[:, idx], freq, metric)
 
     return score
-
 
 # X = [1, 17, 18, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20]
 # y = [1, 1, 1, 1, 2, 2, 2, 2, 2, 1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 2]
