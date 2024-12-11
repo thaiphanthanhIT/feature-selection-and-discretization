@@ -24,7 +24,7 @@ def Opt(val, cand, mode):
         return val, False
 
 
-def scoreDP(val, freq, mode='max', metric='mi', L=2, R=500, cost_mat=None, mic=False, nX=None):
+def scoreDP(val, freq, mode='max', metric='mi', L=2, R=2, cost_mat=None, mic=False, nX=None):
     '''
     Proposed score-wise Dynamic programming algorithm
     NOTE: For DP[v][l], v is 1-based and l is 1-based

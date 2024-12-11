@@ -2,6 +2,8 @@ import math
 from collections import Counter
 
 import numpy as np
+from catboost import CatBoostClassifier
+from scipy.io import loadmat
 from sklearn.neighbors import KNeighborsClassifier
 from ucimlrepo import fetch_ucirepo
 import pandas as pd
@@ -124,11 +126,11 @@ def algorithm1_change(F, C):
         # fi = F[:][i].values.T
         # I_fi_C = mutual_information(fi, C['class'].T)
         # chi2_value = 2 * number_samples * np.log(2) * I_fi_C
-        # degree_of_freedom = (number_samples - 1) * (len(np.unique(C)) - 1)
+        # degree_of_freedom = (len(np.unique(fi)) - 1) * (len(np.unique(C)) - 1)
         fci_discretized = pd.cut(F[:][i], bins=[float('-inf')] + spl_val, labels=False)
         Jrel = mutual_information(fci_discretized, C['class'].T)
         # chi2_R = chi2.sf(chi2_value, degree_of_freedom)
-        if 1:
+        if Jrel > 0:
             Fi = F[:][i].values
             Fi = Fi.reshape(-1, 1)
             Fc = insert(Fc, [cnt + 1], Fi, axis=1)
@@ -139,7 +141,7 @@ def algorithm1_change(F, C):
     Fc = np.delete(Fc, 0, axis=1)
 
     return Fc, Dc, Jc, split_val
-def algorithm2(fi, C, di, S, split_val, JmDSM_pre):
+def algorithm2(fi, C, di, S, split_val, JmDSM_pre, e):
     j = di
     check = 0
     JmDSM_ori = 0
@@ -150,29 +152,29 @@ def algorithm2(fi, C, di, S, split_val, JmDSM_pre):
     # discretizer = KBinsDiscretizer(n_bins=j, encode='ordinal', strategy='uniform')
     # fi_discretized = discretizer.fit_transform(fi.reshape(-1, 1)).flatten()
     fi_discretized = pd.cut(fi, bins=[float('-inf')] + split_val, labels=False)
-    chi2_Rrc = chi2.sf((2*len(fi_discretized)*np.log(2)*mutual_information(fi, C['class'].T)), (len(fi_discretized) - 1)*(len(np.unique(C)) - 1))
-    JmDSM = mutual_information(fi_discretized, C['class'].T) - ((len(np.unique(C)) - 1)*(j - 1))/(2*len(fi_discretized)*np.log(2))
+    # chi2_Rrc = chi2.sf((2*len(fi_discretized)*np.log(2)*mutual_information(fi, C['class'].T)), (len(fi_discretized) - 1)*(len(np.unique(C)) - 1))
+    # JmDSM = mutual_information(fi_discretized, C['class'].T) - ((len(np.unique(C)) - 1)*(j - 1))/(2*len(fi_discretized)*np.log(2))
     JmDSM_ori = mutual_information(fi_discretized, C['class'].T)
     c = 0
     c_test = 0
     r = 0
     r_test = 0
     for i in range(0, len(S)):
-        c = c + CMI(fi_discretized, S[i], C['class'].T)# - (len(np.unique(C))*(j - 1)*(len(np.unique(S[i])) - 1))/(2*len(fi_discretized)*np.log(2))
-        c_test = c_test + chi2.sf((2*len(fi_discretized)*np.log(2)*CMI(fi_discretized, S[i], C['class'].T)), len(np.unique(C))*(j - 1)*(len(np.unique(S[i])) - 1))
-        r = r + mutual_information(fi_discretized, S[i]) - ((j - 1)*(len(np.unique(S[i])) - 1))/(2*len(fi_discretized)*np.log(2))
-        r_test = r_test + chi2.sf(2*len(fi_discretized)*np.log(2)*mutual_information(fi, S[i]), (j - 1)*(len(np.unique(S[i])) - 1))
-        JmDSM = JmDSM + (CMI(fi_discretized, S[i], C['class'].T) - (len(np.unique(C))*(j - 1)*(len(np.unique(S[i])) - 1))/(2*len(fi_discretized)*np.log(2)) - mutual_information(fi_discretized, S[i]) + ((j - 1)*(len(np.unique(S[i])) - 1))/(2*len(fi_discretized)*np.log(2)))/len(S)
-        chi2_Rrc = chi2_Rrc + (chi2.sf((2*len(fi_discretized)*np.log(2)*CMI(fi_discretized, S[i], C['class'].T)), len(np.unique(C))*(j - 1)*(len(np.unique(S[i])) - 1)) - chi2.sf(2*len(fi_discretized)*np.log(2)*mutual_information(fi, S[i]), (j - 1)*(len(np.unique(S[i])) - 1)))/len(S)
+        # c = c + CMI(fi_discretized, S[i], C['class'].T)# - (len(np.unique(C))*(j - 1)*(len(np.unique(S[i])) - 1))/(2*len(fi_discretized)*np.log(2))
+        # c_test = c_test + chi2.sf((2*len(fi_discretized)*np.log(2)*CMI(fi_discretized, S[i], C['class'].T)), len(np.unique(C))*(j - 1)*(len(np.unique(S[i])) - 1))
+        # r = r + mutual_information(fi_discretized, S[i]) - ((j - 1)*(len(np.unique(S[i])) - 1))/(2*len(fi_discretized)*np.log(2))
+        # r_test = r_test + chi2.sf(2*len(fi_discretized)*np.log(2)*mutual_information(fi, S[i]), (j - 1)*(len(np.unique(S[i])) - 1))
+        # JmDSM = JmDSM + (CMI(fi_discretized, S[i], C['class'].T) - (len(np.unique(C))*(j - 1)*(len(np.unique(S[i])) - 1))/(2*len(fi_discretized)*np.log(2)) - mutual_information(fi_discretized, S[i]) + ((j - 1)*(len(np.unique(S[i])) - 1))/(2*len(fi_discretized)*np.log(2)))/len(S)
+        # chi2_Rrc = chi2_Rrc + (chi2.sf((2*len(fi_discretized)*np.log(2)*CMI(fi_discretized, S[i], C['class'].T)), len(np.unique(C))*(j - 1)*(len(np.unique(S[i])) - 1)) - chi2.sf(2*len(fi_discretized)*np.log(2)*mutual_information(fi, S[i]), (j - 1)*(len(np.unique(S[i])) - 1)))/len(S)
         JmDSM_ori = JmDSM_ori + (CMI(fi_discretized, S[i], C['class'].T) - mutual_information(fi_discretized, S[i]))/len(S)
-    if JmDSM_ori > (JmDSM_pre - 0.03):
+    if JmDSM_ori > (JmDSM_pre - e/len(S)):
         check = 1
-    print(JmDSM_ori, JmDSM, chi2_Rrc)
+    print(JmDSM_ori, JmDSM)
 
     return JmDSM_ori, check
 
 
-def mDSM(F, C):
+def mDSM(F, C, e):
     Fc, Dc, Jc, split_val = algorithm1_change(F, C)
     Fc = Fc.T
 
@@ -195,89 +197,251 @@ def mDSM(F, C):
     for i in range(0, len(Fc)):
         fi = Fc[i]
         di = Dc[i]
-        JmDSM, check = algorithm2(fi, C, di, S, split_val[i], T)
+        JmDSM, check = algorithm2(fi, C, di, S, split_val[i], T, e)
         if check:
-            # discretizer = KBinsDiscretizer(n_bins=d_new, encode='ordinal', strategy='uniform')
+            # discretizer = KBinsDiscretizer(n_bins=di, encode='ordinal', strategy='uniform')
             # fci_discretized = discretizer.fit_transform(fi.reshape(-1, 1)).flatten()
             fci_discretized = pd.cut(Fc[i], bins=[float('-inf')] + split_val[i], labels=False)
             S.append(fci_discretized)
             D.append(Dc[i])
             T = JmDSM
+    tmp = -inf
+    tmp_100 = -inf
+    min_position_tmp_100th = -1
+    S_ori = []
+    min_position_tmp = -1
+    print(len(S))
+    while 1:
+        ep = np.zeros(len(S))
+        for p in range(0, len(S)):
+            ep[p] = mutual_information(S[p], C['class'].T)
+            for i in range(0, len(S)):
+                if i == p:
+                    continue
+                ep[p] = ep[p] + (CMI(S[p], S[i], C['class'].T) - mutual_information(S[p], S[i])) / (len(S) - 1)
+        min_position = np.argmin(ep)
+        if min_position_tmp_100th == -1:
+            # min_position_tmp = min_position
+            # tmp = ep[min_position]
+            k = 100
+            sorted_ep = np.partition(ep, k - 1)  # Lấy mảng sao cho phần tử nhỏ thứ k nằm ở vị trí k-1
+            tmp_100 = sorted_ep[k - 1]
+            min_position_tmp_100th = np.where(ep == tmp_100)[0][0]  # Tìm chỉ số đầu tiên
+            indices_to_remove = np.argsort(ep)[:k]
+            S_ori = S
+            S = [s for i, s in enumerate(S) if i not in indices_to_remove]
+            continue
+        print(tmp_100 + e/len(S), np.median(ep))
+        if (np.median(ep)) > (tmp_100 + e/len(S)):
+            # min_position_tmp = min_position
+            # tmp = ep[min_position]
+            sorted_ep = np.partition(ep, k - 1)  # Lấy mảng sao cho phần tử nhỏ thứ k nằm ở vị trí k-1
+            tmp_100 = sorted_ep[k - 1]
+            min_position_tmp_100th = np.where(ep == tmp_100)[0][0]  # Tìm chỉ số đầu tiên
+            indices_to_remove = np.argsort(ep)[:k]
+            S_ori = S
+            S = [s for i, s in enumerate(S) if i not in indices_to_remove]
         else:
-            if len(S) > 4:
-                epq = np.zeros((len(S), len(S)))
-                for p in range(0, len(S)):
-                    for q in range(0, len(S)):
-                        epq[p][q] = CMI(fi, S[p], S[q])
-                        max_position = np.unravel_index(np.argmax(epq), epq.shape)
-                S_change = remove_elements(S, max_position[0] - 1, max_position[1] - 1)
-                JmDSM_change, check_change = algorithm2(fi, C, di, S_change, split_val[i], T)
-                if check_change == 1 and JmDSM_change > JmDSM:
-                    print(JmDSM_change, JmDSM)
-                    fci_discretized = pd.cut(Fc[i], bins=[float('-inf')] + split_val[i], labels=False)
-                    S_change.append(fci_discretized)
-                    D.append(Dc[i])
-                    D = remove_elements(D, max_position[0] - 1, max_position[1] - 1)
-                    S = S_change
+            break
+    while 1:
+        ep = np.zeros(len(S))
+        for p in range(0, len(S)):
+            ep[p] = mutual_information(S[p], C['class'].T)
+            for i in range(0, len(S)):
+                if i == p:
+                    continue
+                ep[p] = ep[p] + (CMI(S[p], S[i], C['class'].T) - mutual_information(S[p], S[i])) / (len(S) - 1)
+        min_position = np.argmin(ep)
+        if min_position_tmp == -1:
+            min_position_tmp = min_position
+            tmp = ep[min_position]
+            S_ori = S
+            S = S[:min_position_tmp] + S[min_position_tmp + 1:]
+            continue
+        print(ep[min_position], tmp + e/len(S), np.median(ep))
+        if (np.median(ep)) > (tmp + e/len(S)):
+            min_position_tmp = min_position
+            tmp = ep[min_position]
+            S_ori = S
+            S = S[:min_position_tmp] + S[min_position_tmp+1:]
+        else:
+            break
+    S = S_ori
+    print(len(S))
     return S, D
 
 
-# dataset = fetch_ucirepo(id=74)
+# dataset = fetch_ucirepo(id=94)
 #
 # X = dataset.data.features
 # y = dataset.data.targets
 # y_ = dataset.data.targets
-# # y = y.drop('NSP', axis=1)
-# # X = X.drop('MUSK-188', axis=1)
-# # X = X.values
-#
+# weights = [0, 1, 2, 3, 4, 5, 6]
+# y__ = y_.dot(weights)
+# y = pd.DataFrame(y__, columns=['class'])
+
+# X['Attribute38'].fillna(X['Attribute38'].mean(), inplace=True)
+# X['Attribute4'].fillna(X['Attribute4'].mean(), inplace=True)
+# y = y.drop('NSP', axis=1)
+# X = X.drop('age', axis=1)
+# X = X.drop('MDVP:Shimmer', axis=1)
+# X = X.values
+# y.columns = ['class']
 # le = LabelEncoder()
-# X['molecule_name'] = le.fit_transform(X['molecule_name'])
+# X = X.drop('conformation_name', axis=1)
+# X = X.drop('molecule_name', axis=1)
+# y['class'] = le.fit_transform(y['class'])
 # X['conformation_name'] = le.fit_transform(X['conformation_name'])
-# y_['class'] = le.fit_transform(y_['class'])
+# X['molecule_name'] = le.fit_transform(X['molecule_name'])
+# X['Attribute1'] = le.fit_transform(X['Attribute1'])
+# X['Attribute3'] = le.fit_transform(X['Attribute3'])
+# X['Attribute4'] = le.fit_transform(X['Attribute4'])
+# X['Attribute6'] = le.fit_transform(X['Attribute6'])
+# X['Attribute7'] = le.fit_transform(X['Attribute7'])
+# X['Attribute9'] = le.fit_transform(X['Attribute9'])
+# X['Attribute10'] = le.fit_transform(X['Attribute10'])
+# X['Attribute12'] = le.fit_transform(X['Attribute12'])
+# X['Attribute14'] = le.fit_transform(X['Attribute14'])
+# X['Attribute15'] = le.fit_transform(X['Attribute15'])
+# X['Attribute17'] = le.fit_transform(X['Attribute17'])
+# X['Attribute19'] = le.fit_transform(X['Attribute19'])
+# X['Attribute20'] = le.fit_transform(X['Attribute20'])
 # # y = y.to_numpy()
 
-with open('arrhythmia.data', 'r') as file:
-    lines = file.readlines()
+# Arrhythmia
+# with open('arrhythmia.data', 'r') as file:
+#     lines = file.readlines()
+#     features = []
+#     targets = []
+#     for line in lines:
+#         row = [float(i) if i != '?' else np.nan for i in line.strip().split(",")]
+#         features.append(row[:-1])
+#         targets.append(row[-1])
+#     X = pd.DataFrame(features)
+#     y = pd.DataFrame(targets, columns=["class"])
+#     X.fillna(X.mean(), inplace=True)
+#     y.fillna(y.mean(), inplace=True)
 
-    features = []
-    targets = []
+#semeion
+# data = pd.read_csv("semeion.data", delimiter=" ", header=None)
+# X = []
+# y = []
+# for _, row in data.iterrows():
+#     row_list = row.tolist()
+#     feature_values = row_list[:-11]
+#     target_values = row_list[-11:-1]
+#     target_sum = sum(value * index for index, value in enumerate(target_values))
+#     y.append(target_sum)
+#     X.append(feature_values)
+# X = pd.DataFrame(X, columns=[f'feature_{i + 1}' for i in range(len(X[0]))])
+# y = pd.DataFrame(y, columns=['class'])
 
-    for line in lines:
-        row = [float(i) if i != '?' else np.nan for i in line.strip().split(",")]
-        features.append(row[:-1])
-        targets.append(row[-1])
+#madelon
+# data = pd.read_csv("F:\Download\mdlon.csv")
+# last_column = data.columns[-1]
+# X = data.drop(columns=[data.columns[-1]])
+# y = data[[last_column]]
+# y.columns = ['class']
+# print(X, y)
+# file_path1 = "madelon_train.data"
+# X1 = pd.read_csv(file_path1, delim_whitespace=True, header=None)
+# file_path2 = "madelon_valid.data"
+# X2 = pd.read_csv(file_path2, delim_whitespace=True, header=None)
+# X = pd.concat([X1, X2], ignore_index=True)
+# file_path_label1 = "madelon_train.labels"
+# y1 = pd.read_csv(file_path_label1, delim_whitespace=True, header=None)
+# file_path_label2 = "madelon_valid.labels"
+# y2 = pd.read_csv(file_path_label2, delim_whitespace=True, header=None)
+# y = pd.concat([y1, y2], ignore_index=True)
+# y.columns = ['class']
+# print(X,y)
 
-    X = pd.DataFrame(features)
-    y = pd.DataFrame(targets, columns=["class"])
+# lung, colon (colon e = -0.028)
+file_path = 'lung.mat'
+data = loadmat(file_path)
+X = pd.DataFrame(data['X'])
+y = pd.DataFrame(data['Y'], columns=['class'])
 
-    X.fillna(X.mean(), inplace=True)
-    y.fillna(y.mean(), inplace=True)
+# # dbword
+# file_path = 'dbworld_bodies.mat'
+# data = loadmat(file_path)
+# X = pd.DataFrame(data['inputs'])
+# y = pd.DataFrame(data['labels'], columns=['class'])
 
-S, D = mDSM(X, y)
+# heart, pima
+# df = pd.read_csv("F:\Download\diabetes.csv")
+# y = df[[df.columns[-1]]]
+# X = df[df.columns[:-1]]
+# y.columns = ['class']
+
+# parkinsons
+# with open("F:\Download\parkinsons.data.txt", "r") as file:
+#     data = [line.strip().split(",") for line in file]
+# df = pd.DataFrame(data)
+# df = df.apply(pd.to_numeric, errors='coerce')
+# target_column = len(df.columns) - 7
+# y = df[[target_column]]
+# X = df.drop(columns=target_column)
+# X = X.drop(0, axis=1)
+# y.columns = ['class']
+
+# BreastTissue
+# file_path = 'F:\Download\BreastTissue.xls'
+# df = pd.read_excel(file_path, sheet_name='Data')
+# print(df)
+# y = df[[df.columns[1]]]
+# X = df[df.columns[2:]]
+# print(X, y)
+# y.columns = ['class']
+# le = LabelEncoder()
+# y['class'] = le.fit_transform(y['class'])
+
+# Libras
+# with open("movement_libras.data", "r") as file:
+#     data = [line.strip().split(",") for line in file]
+# df = pd.DataFrame(data)
+# df = df.apply(pd.to_numeric, errors='coerce')
+# target_column = len(df.columns) - 1
+# y = df[[target_column]]
+# X = df.drop(columns=target_column)
+# y.columns = ['class']
+# print(X, y)
+
+e = 10
+S, D = mDSM(X, y, e)
+
 y = y.values
 X = np.array(S).T
 # X_test_selected = np.array([X_test[:, i] for i in range(len(S))]).T
 
 # big
 clf = SVC(kernel='linear')
+# clf = CatBoostClassifier(verbose=0)
 # clf = KNeighborsClassifier(n_neighbors=len(unique(y)))
 scores_selected = cross_val_score(clf, X, y, cv=10)
+print(e)
 print(len(S))
 print(f"Độ chính xác trung bình với các đặc trưng đã chọn (10-CV): {scores_selected.mean():.4f}")
 
+# # clf = SVC(kernel='linear')
+# clf = KNeighborsClassifier(n_neighbors=2)
+# scores_selected = cross_val_score(clf, X, y, cv=10)
+# print(e)
+# print(len(S))
+# print(f"Độ chính xác trung bình với các đặc trưng đã chọn (10-CV): {scores_selected.mean():.4f}")
+
 # small
-# model = SVC(kernel='linear')
-# loo = LeaveOneOut()
-# y_true, y_pred = [], []
-# for train_index, test_index in loo.split(X):
-#     X_train, X_test = X[train_index], X[test_index]
-#     y_train, y_test = y[train_index], y[test_index]
-#     model.fit(X_train, y_train)
-#     y_pred.append(model.predict(X_test)[0])
-#     y_true.append(y_test[0])
-# accuracy = accuracy_score(y_true, y_pred)
-# print(f'Độ chính xác trung bình với các đặc trưng đã chọn (LOO): {accuracy:.4f}')
+model = SVC(kernel='linear')
+loo = LeaveOneOut()
+y_true, y_pred = [], []
+for train_index, test_index in loo.split(X):
+    X_train, X_test = X[train_index], X[test_index]
+    y_train, y_test = y[train_index], y[test_index]
+    model.fit(X_train, y_train)
+    y_pred.append(model.predict(X_test)[0])
+    y_true.append(y_test[0])
+accuracy = accuracy_score(y_true, y_pred)
+print(f'Độ chính xác trung bình với các đặc trưng đã chọn (LOO): {accuracy:.4f}')
 
 # clf_all = SVC(kernel='linear')
 #
