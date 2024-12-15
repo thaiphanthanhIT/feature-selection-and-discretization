@@ -20,28 +20,36 @@ from sklearn.svm import SVC
 import utils
 from binalgo import scoreDP
 
-
-def calc_MI(X, Y, bins):
-    c_XY = np.histogram2d(X, Y, bins)[0]
-    c_X = np.histogram(X, bins)[0]
-    c_Y = np.histogram(Y, bins)[0]
-
-    H_X = shan_entropy(c_X)
-    H_Y = shan_entropy(c_Y)
-    H_XY = shan_entropy(c_XY)
-
-    MI = H_X + H_Y - H_XY
-    return MI
-
-
 def shan_entropy(c):
+    """
+        Calculate Shannon Entropy from a histogram
+
+        Input:
+        -----
+        c {pandas.Series}       : Histogram counting the number of elements
+
+        Output:
+        ------
+        H {float}               : The Shannon Entropy value
+    """
     c_normalized = c / float(np.sum(c))
     c_normalized = c_normalized[np.nonzero(c_normalized)]
     H = -sum(c_normalized * np.log2(c_normalized))
     return H
 
 def mutual_information(X, Y):
+    """
+        Calculate Mutual Information between two discrete variables X and Y
 
+        Input:
+        -----
+        X {pandas.Series}          : Input variable X
+        Y {pandas.Series}          : Input variable Y
+
+        Output:
+        ------
+        MI {float}                 : Mutual Information value between X and Y
+    """
     counter_X = Counter(X)
     counter_Y = Counter(Y)
 
@@ -61,6 +69,22 @@ def mutual_information(X, Y):
     return MI
 
 def compute_prob(X, Y, Z):
+    """
+        Compute conditional probabilities from three variables X, Y, and Z
+
+        Input:
+        -----
+        X {pandas.Series}       : Input variable X
+        Y {pandas.Series}       : Input variable Y
+        Z {pandas.Series}       : Conditioning variable Z
+
+        Output:
+        ------
+        P_z {float}             : Probability of Z
+        P_xz {float}            : Conditional probability of X given Z
+        P_yz {float}            : Conditional probability of Y given Z
+        P_xyz {float}           : Conditional probability of X and Y given Z
+    """
     n = len(Z)
     P_z = Counter(Z)
     for k in P_z:
@@ -93,6 +117,19 @@ def compute_prob(X, Y, Z):
     return P_z, P_xz, P_yz, P_xyz
 
 def CMI(X, Y, Z):
+    """
+        Compute Conditional Mutual Information between X and Y conditioned on Z
+
+        Input:
+        -----
+        X {pandas.Series}          : Input variable X
+        Y {pandas.Series}          : Input variable Y
+        Z {pandas.Series}          : Conditioning variable Z
+
+        Output:
+        ------
+        I_xyz {float}              : Conditional Mutual Information (CMI) value
+    """
     P_z, P_xz, P_yz, P_xyz = compute_prob(X, Y, Z)
     I_xyz = 0
 
@@ -108,28 +145,48 @@ def CMI(X, Y, Z):
     return I_xyz
 
 def remove_elements(arr, p, q):
+    """
+        Remove two elements at indices p and q from a list
+
+        Input:
+        -----
+        arr {list}             : Input list
+        p {int}                : Index of the first element to remove
+        q {int}                : Index of the second element to remove
+
+        Output:
+        ------
+        result {list}          : List after removing the elements
+    """
     return [arr[i] for i in range(len(arr)) if i != p and i != q]
 
-def algorithm1_change(F, C):
-    number_features = F.shape[1]
-    number_samples = F.shape[0]
+def algorithm1(F, C):
+    """
+        Select and discretize features based on mutual information and dynamic programming
+
+        Input:
+        -----
+        F {DataFrame}          : Feature matrix
+        C {DataFrame}          : Class labels
+
+        Output:
+        ------
+        Fc {list}               : Discretized features
+        Dc {list}               : Number of splits for each feature
+        Jc {list}               : Scores for the selected features
+        split_val {list}        : List of cut points for each feature
+    """
     result = pd.concat([F, C], axis=1)
-    Fc = np.zeros((number_samples, 1))
+    Fc = np.zeros((F.shape[0], 1))
     Dc = []
     split_val = []
     Jc = []
     cnt = 0
+
     for i in F.columns:
         val, freq, _ = utils.makePrebins(result, i, C.columns[0])
         opt_score, spl_val, j = scoreDP(val, freq)
-        print(i)
-        # fi = F[:][i].values.T
-        # I_fi_C = mutual_information(fi, C['class'].T)
-        # chi2_value = 2 * number_samples * np.log(2) * I_fi_C
-        # degree_of_freedom = (len(np.unique(fi)) - 1) * (len(np.unique(C)) - 1)
-        fci_discretized = pd.cut(F[:][i], bins=[float('-inf')] + spl_val, labels=False)
-        Jrel = mutual_information(fci_discretized, C['class'].T)
-        # chi2_R = chi2.sf(chi2_value, degree_of_freedom)
+        Jrel = mutual_information(pd.cut(F[:][i], bins=[float('-inf')] + spl_val, labels=False), C['class'].T)
         if Jrel > 0:
             Fi = F[:][i].values
             Fi = Fi.reshape(-1, 1)
@@ -141,43 +198,58 @@ def algorithm1_change(F, C):
     Fc = np.delete(Fc, 0, axis=1)
 
     return Fc, Dc, Jc, split_val
-def algorithm2(fi, C, di, S, split_val, JmDSM_pre, e):
-    j = di
+
+def algorithm2(fi, C, di, S, split_val, Jjmi_pre, e):
+    """
+        Evaluate and refine the inclusion of a feature in the selected set
+
+        Input:
+        -----
+        fi {array}             : Feature values
+        C {DataFrame}          : Class labels
+        di {int}               : Number of splits
+        S {list}               : Selected features
+        split_val {list}       : Split values for discretization
+        Jjmi_pre {float}       : Previous score
+        e {float}              : Threshold parameter
+
+        Output:
+        ------
+        Jjmi {float}           : New score
+        check {bool}           : Inclusion status of the feature
+    """
     check = 0
-    JmDSM_ori = 0
-    JmDSM = 0
-    chi2_Rrc = 0
-    d_new = 0
+    Jjmi = 0
 
-    # discretizer = KBinsDiscretizer(n_bins=j, encode='ordinal', strategy='uniform')
-    # fi_discretized = discretizer.fit_transform(fi.reshape(-1, 1)).flatten()
     fi_discretized = pd.cut(fi, bins=[float('-inf')] + split_val, labels=False)
-    # chi2_Rrc = chi2.sf((2*len(fi_discretized)*np.log(2)*mutual_information(fi, C['class'].T)), (len(fi_discretized) - 1)*(len(np.unique(C)) - 1))
-    # JmDSM = mutual_information(fi_discretized, C['class'].T) - ((len(np.unique(C)) - 1)*(j - 1))/(2*len(fi_discretized)*np.log(2))
-    JmDSM_ori = mutual_information(fi_discretized, C['class'].T)
-    c = 0
-    c_test = 0
-    r = 0
-    r_test = 0
+    Jjmi_ori = mutual_information(fi_discretized, C['class'].T)
     for i in range(0, len(S)):
-        # c = c + CMI(fi_discretized, S[i], C['class'].T)# - (len(np.unique(C))*(j - 1)*(len(np.unique(S[i])) - 1))/(2*len(fi_discretized)*np.log(2))
-        # c_test = c_test + chi2.sf((2*len(fi_discretized)*np.log(2)*CMI(fi_discretized, S[i], C['class'].T)), len(np.unique(C))*(j - 1)*(len(np.unique(S[i])) - 1))
-        # r = r + mutual_information(fi_discretized, S[i]) - ((j - 1)*(len(np.unique(S[i])) - 1))/(2*len(fi_discretized)*np.log(2))
-        # r_test = r_test + chi2.sf(2*len(fi_discretized)*np.log(2)*mutual_information(fi, S[i]), (j - 1)*(len(np.unique(S[i])) - 1))
-        # JmDSM = JmDSM + (CMI(fi_discretized, S[i], C['class'].T) - (len(np.unique(C))*(j - 1)*(len(np.unique(S[i])) - 1))/(2*len(fi_discretized)*np.log(2)) - mutual_information(fi_discretized, S[i]) + ((j - 1)*(len(np.unique(S[i])) - 1))/(2*len(fi_discretized)*np.log(2)))/len(S)
-        # chi2_Rrc = chi2_Rrc + (chi2.sf((2*len(fi_discretized)*np.log(2)*CMI(fi_discretized, S[i], C['class'].T)), len(np.unique(C))*(j - 1)*(len(np.unique(S[i])) - 1)) - chi2.sf(2*len(fi_discretized)*np.log(2)*mutual_information(fi, S[i]), (j - 1)*(len(np.unique(S[i])) - 1)))/len(S)
-        JmDSM_ori = JmDSM_ori + (CMI(fi_discretized, S[i], C['class'].T) - mutual_information(fi_discretized, S[i]))/len(S)
-    if JmDSM_ori > (JmDSM_pre - e/len(S)):
+        Jjmi_ori = Jjmi_ori + (CMI(fi_discretized, S[i], C['class'].T) - mutual_information(fi_discretized, S[i])) / len(S)
+    if Jjmi_ori > (Jjmi_pre - e / len(S)):
         check = 1
-    print(JmDSM_ori, JmDSM)
+    print(Jjmi_ori, Jjmi)
 
-    return JmDSM_ori, check
-
+    return Jjmi_ori, check
 
 def mDSM(F, C, e):
-    Fc, Dc, Jc, split_val = algorithm1_change(F, C)
+    """
+    Proposed score-wise Dynamic programming algorithm
+
+    Input:
+    -----
+    F {DataFrame}          : Feature matrix
+    C {DataFrame}          : Class labels
+    e {float}              : Threshold parameter
+
+    Output:
+    ------
+    S {list}               : Selected discretized features
+    D {list}               : Number of splits for each selected feature
+    """
+    Fc, Dc, Jc, split_val = algorithm1(F, C)
     Fc = Fc.T
 
+    # Sort features based on their mutual information scores (Jc)
     sorted_indices = np.argsort(Jc)[::-1]
     Fc = [Fc[i] for i in sorted_indices]
     Dc = [Dc[i] for i in sorted_indices]
@@ -185,31 +257,29 @@ def mDSM(F, C, e):
     split_val = [split_val[i] for i in sorted_indices]
 
     S = []
-    # discretizer = KBinsDiscretizer(n_bins=Dc[0], encode='ordinal', strategy='uniform')
-    # fci_discretized = discretizer.fit_transform(Fc[0].reshape(-1, 1)).flatten()
-    fci_discretized = pd.cut(Fc[0], bins=[float('-inf')] + split_val[0], labels=False)
-    S.append(fci_discretized)
-    D = [Dc[0]]
+    D = []
+    S.append(pd.cut(Fc[0], bins=[float('-inf')] + split_val[0], labels=False))
+    D.append(Dc[0])
+
     Fc.pop(0)
     Dc.pop(0)
     split_val.pop(0)
-    T = -inf
-    for i in range(0, len(Fc)):
+
+    T = -np.inf
+    for i in range(len(Fc)):
         fi = Fc[i]
         di = Dc[i]
-        JmDSM, check = algorithm2(fi, C, di, S, split_val[i], T, e)
+        Jjmi, check = algorithm2(fi, C, di, S, split_val[i], T, e)
         if check:
-            # discretizer = KBinsDiscretizer(n_bins=di, encode='ordinal', strategy='uniform')
-            # fci_discretized = discretizer.fit_transform(fi.reshape(-1, 1)).flatten()
-            fci_discretized = pd.cut(Fc[i], bins=[float('-inf')] + split_val[i], labels=False)
-            S.append(fci_discretized)
+            S.append(pd.cut(Fc[i], bins=[float('-inf')] + split_val[i], labels=False))
             D.append(Dc[i])
-            T = JmDSM
-    tmp = -inf
+            T = Jjmi
+
+    S_ori = S[:]
+    tmp = -np.inf
     min_position_tmp = -1
-    S_ori = []
     print(len(S))
-    while 1:
+    while True:
         ep = np.zeros(len(S))
         for p in range(0, len(S)):
             ep[p] = mutual_information(S[p], C['class'].T)
@@ -224,18 +294,17 @@ def mDSM(F, C, e):
             S_ori = S
             S = S[:min_position_tmp] + S[min_position_tmp + 1:]
             continue
-        print(ep[min_position], tmp + e/len(S), np.median(ep))
-        if (np.median(ep)) > (tmp + e/len(S)):
+        print(ep[min_position], tmp + e / len(S), np.median(ep))
+        if (np.median(ep)) > (tmp + e / len(S)):
             min_position_tmp = min_position
             tmp = ep[min_position]
             S_ori = S
-            S = S[:min_position_tmp] + S[min_position_tmp+1:]
+            S = S[:min_position_tmp] + S[min_position_tmp + 1:]
         else:
             break
     S = S_ori
     print(len(S))
     return S, D
-
 
 # dataset = fetch_ucirepo(id=94)
 #
@@ -323,10 +392,10 @@ def mDSM(F, C, e):
 # print(X,y)
 
 # lung, colon (colon e = -0.028)
-file_path = 'lung.mat'
-data = loadmat(file_path)
-X = pd.DataFrame(data['X'])
-y = pd.DataFrame(data['Y'], columns=['class'])
+# file_path = 'lung.mat'
+# data = loadmat(file_path)
+# X = pd.DataFrame(data['X'])
+# y = pd.DataFrame(data['Y'], columns=['class'])
 
 # # dbword
 # file_path = 'dbworld_bodies.mat'
@@ -335,10 +404,10 @@ y = pd.DataFrame(data['Y'], columns=['class'])
 # y = pd.DataFrame(data['labels'], columns=['class'])
 
 # heart, pima
-# df = pd.read_csv("F:\Download\diabetes.csv")
-# y = df[[df.columns[-1]]]
-# X = df[df.columns[:-1]]
-# y.columns = ['class']
+df = pd.read_csv("F:\Download\dataset_heart.csv")
+y = df[[df.columns[-1]]]
+X = df[df.columns[:-1]]
+y.columns = ['class']
 
 # parkinsons
 # with open("F:\Download\parkinsons.data.txt", "r") as file:
@@ -373,7 +442,7 @@ y = pd.DataFrame(data['Y'], columns=['class'])
 # y.columns = ['class']
 # print(X, y)
 
-e = 10
+e = 0.5
 S, D = mDSM(X, y, e)
 
 y = y.values

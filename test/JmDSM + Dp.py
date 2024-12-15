@@ -111,7 +111,6 @@ def remove_elements(arr, p, q):
     return [arr[i] for i in range(len(arr)) if i != p and i != q]
 
 def algorithm1_change(F, C):
-    best = 0
     number_features = F.shape[1]
     number_samples = F.shape[0]
     result = pd.concat([F, C], axis=1)
@@ -123,8 +122,6 @@ def algorithm1_change(F, C):
     for i in F.columns:
         val, freq, _ = utils.makePrebins(result, i, C.columns[0])
         opt_score, spl_val, j = scoreDP(val, freq)
-        best = max(best, len(np.unique(F[:][i])))
-        print(best)
         print(i)
         # fi = F[:][i].values.T
         # I_fi_C = mutual_information(fi, C['class'].T)
@@ -208,10 +205,43 @@ def mDSM(F, C, e):
             S.append(fci_discretized)
             D.append(Dc[i])
             T = JmDSM
+    tmp_100 = -inf
+    min_position_tmp_100th = -1
+    S_ori = []
     tmp = -inf
     min_position_tmp = -1
-    S_ori = []
     print(len(S))
+    while 1:
+        ep = np.zeros(len(S))
+        for p in range(0, len(S)):
+            ep[p] = mutual_information(S[p], C['class'].T)
+            for i in range(0, len(S)):
+                if i == p:
+                    continue
+                ep[p] = ep[p] + (CMI(S[p], S[i], C['class'].T) - mutual_information(S[p], S[i])) / (len(S) - 1)
+        if min_position_tmp_100th == -1:
+            # min_position_tmp = min_position
+            # tmp = ep[min_position]
+            k = 100
+            sorted_ep = np.partition(ep, k - 1)  # Lấy mảng sao cho phần tử nhỏ thứ k nằm ở vị trí k-1
+            tmp_100 = sorted_ep[k - 1]
+            min_position_tmp_100th = np.where(ep == tmp_100)[0][0]  # Tìm chỉ số đầu tiên
+            indices_to_remove = np.argsort(ep)[:k]
+            S_ori = S
+            S = [s for i, s in enumerate(S) if i not in indices_to_remove]
+            continue
+        print(tmp_100 + e/len(S), np.median(ep))
+        if (np.median(ep)) > (tmp_100 + e/len(S)):
+            # min_position_tmp = min_position
+            # tmp = ep[min_position]
+            sorted_ep = np.partition(ep, k - 1)  # Lấy mảng sao cho phần tử nhỏ thứ k nằm ở vị trí k-1
+            tmp_100 = sorted_ep[k - 1]
+            min_position_tmp_100th = np.where(ep == tmp_100)[0][0]  # Tìm chỉ số đầu tiên
+            indices_to_remove = np.argsort(ep)[:k]
+            S_ori = S
+            S = [s for i, s in enumerate(S) if i not in indices_to_remove]
+        else:
+            break
     while 1:
         ep = np.zeros(len(S))
         for p in range(0, len(S)):
@@ -240,10 +270,10 @@ def mDSM(F, C, e):
     return S, D
 
 
-dataset = fetch_ucirepo(id=151)
-
-X = dataset.data.features
-y = dataset.data.targets
+# dataset = fetch_ucirepo(id=94)
+#
+# X = dataset.data.features
+# y = dataset.data.targets
 # y_ = dataset.data.targets
 # weights = [0, 1, 2, 3, 4, 5, 6]
 # y__ = y_.dot(weights)
@@ -255,11 +285,11 @@ y = dataset.data.targets
 # X = X.drop('age', axis=1)
 # X = X.drop('MDVP:Shimmer', axis=1)
 # X = X.values
-y.columns = ['class']
-le = LabelEncoder()
+# y.columns = ['class']
+# le = LabelEncoder()
 # X = X.drop('conformation_name', axis=1)
 # X = X.drop('molecule_name', axis=1)
-y['class'] = le.fit_transform(y['class'])
+# y['class'] = le.fit_transform(y['class'])
 # X['conformation_name'] = le.fit_transform(X['conformation_name'])
 # X['molecule_name'] = le.fit_transform(X['molecule_name'])
 # X['Attribute1'] = le.fit_transform(X['Attribute1'])
@@ -326,10 +356,10 @@ y['class'] = le.fit_transform(y['class'])
 # print(X,y)
 
 # lung, colon (colon e = -0.028)
-# file_path = 'lung.mat'
-# data = loadmat(file_path)
-# X = pd.DataFrame(data['X'])
-# y = pd.DataFrame(data['Y'], columns=['class'])
+file_path = 'lung.mat'
+data = loadmat(file_path)
+X = pd.DataFrame(data['X'])
+y = pd.DataFrame(data['Y'], columns=['class'])
 
 # # dbword
 # file_path = 'dbworld_bodies.mat'
@@ -376,7 +406,7 @@ y['class'] = le.fit_transform(y['class'])
 # y.columns = ['class']
 # print(X, y)
 
-e = 0.4
+e = 20
 S, D = mDSM(X, y, e)
 
 y = y.values
@@ -399,18 +429,18 @@ print(f"Độ chính xác trung bình với các đặc trưng đã chọn (10-C
 # print(len(S))
 # print(f"Độ chính xác trung bình với các đặc trưng đã chọn (10-CV): {scores_selected.mean():.4f}")
 
-# # small
-# model = SVC(kernel='linear')
-# loo = LeaveOneOut()
-# y_true, y_pred = [], []
-# for train_index, test_index in loo.split(X):
-#     X_train, X_test = X[train_index], X[test_index]
-#     y_train, y_test = y[train_index], y[test_index]
-#     model.fit(X_train, y_train)
-#     y_pred.append(model.predict(X_test)[0])
-#     y_true.append(y_test[0])
-# accuracy = accuracy_score(y_true, y_pred)
-# print(f'Độ chính xác trung bình với các đặc trưng đã chọn (LOO): {accuracy:.4f}')
+# small
+model = SVC(kernel='linear')
+loo = LeaveOneOut()
+y_true, y_pred = [], []
+for train_index, test_index in loo.split(X):
+    X_train, X_test = X[train_index], X[test_index]
+    y_train, y_test = y[train_index], y[test_index]
+    model.fit(X_train, y_train)
+    y_pred.append(model.predict(X_test)[0])
+    y_true.append(y_test[0])
+accuracy = accuracy_score(y_true, y_pred)
+print(f'Độ chính xác trung bình với các đặc trưng đã chọn (LOO): {accuracy:.4f}')
 
 # clf_all = SVC(kernel='linear')
 #

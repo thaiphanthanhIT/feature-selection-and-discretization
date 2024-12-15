@@ -24,7 +24,7 @@ def Opt(val, cand, mode):
         return val, False
 
 
-def scoreDP(val, freq, mode='max', metric='mi', L=2, R=2, cost_mat=None, mic=False, nX=None):
+def scoreDP(val, freq, mode='max', metric='mi', L=2, R=7, cost_mat=None, mic=False, nX=None):
     '''
     Proposed score-wise Dynamic programming algorithm
     NOTE: For DP[v][l], v is 1-based and l is 1-based
@@ -167,24 +167,3 @@ def equalWidth(df, FEATURE, n_bin, freq, val, metric='entropy'):
 
     return score
 
-
-# X = [1, 17, 18, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20]
-# y = [1, 1, 1, 1, 2, 2, 2, 2, 2, 1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 2]
-#
-# val = convert_array_feature(X)
-# y_prime = convert_array_class(y)
-# freq = calculate_frequency(val, y_prime)
-# print(val)
-# print(scoreDP(val, freq))
-
-# iris = fetch_ucirepo(id=53)
-#
-# # data (as pandas dataframes)
-# X = iris.data.features
-# y = iris.data.targets
-# result = pd.concat([X, y], axis=1)
-#
-# val, freq, _ = utils.makePrebins(result, 'sepal length', 'class')
-# print(val)
-# print(freq)
-# print(scoreDP(val, freq))

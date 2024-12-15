@@ -185,8 +185,6 @@ def mDSM(F, C, e):
     split_val = [split_val[i] for i in sorted_indices]
 
     S = []
-    # discretizer = KBinsDiscretizer(n_bins=Dc[0], encode='ordinal', strategy='uniform')
-    # fci_discretized = discretizer.fit_transform(Fc[0].reshape(-1, 1)).flatten()
     fci_discretized = pd.cut(Fc[0], bins=[float('-inf')] + split_val[0], labels=False)
     S.append(fci_discretized)
     D = [Dc[0]]
@@ -206,43 +204,9 @@ def mDSM(F, C, e):
             D.append(Dc[i])
             T = JmDSM
     tmp = -inf
-    tmp_100 = -inf
-    min_position_tmp_100th = -1
-    S_ori = []
     min_position_tmp = -1
+    S_ori = []
     print(len(S))
-    while 1:
-        ep = np.zeros(len(S))
-        for p in range(0, len(S)):
-            ep[p] = mutual_information(S[p], C['class'].T)
-            for i in range(0, len(S)):
-                if i == p:
-                    continue
-                ep[p] = ep[p] + (CMI(S[p], S[i], C['class'].T) - mutual_information(S[p], S[i])) / (len(S) - 1)
-        min_position = np.argmin(ep)
-        if min_position_tmp_100th == -1:
-            # min_position_tmp = min_position
-            # tmp = ep[min_position]
-            k = 100
-            sorted_ep = np.partition(ep, k - 1)  # Lấy mảng sao cho phần tử nhỏ thứ k nằm ở vị trí k-1
-            tmp_100 = sorted_ep[k - 1]
-            min_position_tmp_100th = np.where(ep == tmp_100)[0][0]  # Tìm chỉ số đầu tiên
-            indices_to_remove = np.argsort(ep)[:k]
-            S_ori = S
-            S = [s for i, s in enumerate(S) if i not in indices_to_remove]
-            continue
-        print(tmp_100 + e/len(S), np.median(ep))
-        if (np.median(ep)) > (tmp_100 + e/len(S)):
-            # min_position_tmp = min_position
-            # tmp = ep[min_position]
-            sorted_ep = np.partition(ep, k - 1)  # Lấy mảng sao cho phần tử nhỏ thứ k nằm ở vị trí k-1
-            tmp_100 = sorted_ep[k - 1]
-            min_position_tmp_100th = np.where(ep == tmp_100)[0][0]  # Tìm chỉ số đầu tiên
-            indices_to_remove = np.argsort(ep)[:k]
-            S_ori = S
-            S = [s for i, s in enumerate(S) if i not in indices_to_remove]
-        else:
-            break
     while 1:
         ep = np.zeros(len(S))
         for p in range(0, len(S)):
@@ -357,10 +321,10 @@ def mDSM(F, C, e):
 # print(X,y)
 
 # lung, colon (colon e = -0.028)
-file_path = 'lung.mat'
-data = loadmat(file_path)
-X = pd.DataFrame(data['X'])
-y = pd.DataFrame(data['Y'], columns=['class'])
+# file_path = 'lung.mat'
+# data = loadmat(file_path)
+# X = pd.DataFrame(data['X'])
+# y = pd.DataFrame(data['Y'], columns=['class'])
 
 # # dbword
 # file_path = 'dbworld_bodies.mat'
@@ -369,10 +333,10 @@ y = pd.DataFrame(data['Y'], columns=['class'])
 # y = pd.DataFrame(data['labels'], columns=['class'])
 
 # heart, pima
-# df = pd.read_csv("F:\Download\diabetes.csv")
-# y = df[[df.columns[-1]]]
-# X = df[df.columns[:-1]]
-# y.columns = ['class']
+df = pd.read_csv("F:\Download\dataset_heart.csv")
+y = df[[df.columns[-1]]]
+X = df[df.columns[:-1]]
+y.columns = ['class']
 
 # parkinsons
 # with open("F:\Download\parkinsons.data.txt", "r") as file:
@@ -407,7 +371,7 @@ y = pd.DataFrame(data['Y'], columns=['class'])
 # y.columns = ['class']
 # print(X, y)
 
-e = 10
+e = 0.5
 S, D = mDSM(X, y, e)
 
 y = y.values
@@ -431,17 +395,17 @@ print(f"Độ chính xác trung bình với các đặc trưng đã chọn (10-C
 # print(f"Độ chính xác trung bình với các đặc trưng đã chọn (10-CV): {scores_selected.mean():.4f}")
 
 # small
-model = SVC(kernel='linear')
-loo = LeaveOneOut()
-y_true, y_pred = [], []
-for train_index, test_index in loo.split(X):
-    X_train, X_test = X[train_index], X[test_index]
-    y_train, y_test = y[train_index], y[test_index]
-    model.fit(X_train, y_train)
-    y_pred.append(model.predict(X_test)[0])
-    y_true.append(y_test[0])
-accuracy = accuracy_score(y_true, y_pred)
-print(f'Độ chính xác trung bình với các đặc trưng đã chọn (LOO): {accuracy:.4f}')
+# model = SVC(kernel='linear')
+# loo = LeaveOneOut()
+# y_true, y_pred = [], []
+# for train_index, test_index in loo.split(X):
+#     X_train, X_test = X[train_index], X[test_index]
+#     y_train, y_test = y[train_index], y[test_index]
+#     model.fit(X_train, y_train)
+#     y_pred.append(model.predict(X_test)[0])
+#     y_true.append(y_test[0])
+# accuracy = accuracy_score(y_true, y_pred)
+# print(f'Độ chính xác trung bình với các đặc trưng đã chọn (LOO): {accuracy:.4f}')
 
 # clf_all = SVC(kernel='linear')
 #
