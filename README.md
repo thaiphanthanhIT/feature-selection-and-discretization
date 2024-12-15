@@ -1,2 +1,2 @@
 # feature-selection-and-discretization
-Hello 
+A new algorithm for discretization and simultaneous feature selection.
